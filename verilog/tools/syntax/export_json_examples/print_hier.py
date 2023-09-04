@@ -48,19 +48,18 @@ def process_file_data(path: str, data: verible_verilog_syntax.SyntaxData):
       print(f"\033[90m{prefix}\033[0m{node.to_formatted_string()}")
     print()
 
-def print_parents(module):
+def print_parents_r(module):
     for parent in module.parents:
       print(f'{module.name} referenced in {parent.name} ({parent.fpath})')
-      print_parents(parent)
+      print_parents_r(parent)
 
-
-def print_refs(modules, modulename):
+def print_parents(modules, modulename):
   if modulename in modules:
     module = modules[modulename]
-    print_parents(module)
+    print(f'module {modulename} ({module.fpath})')
+    print_parents_r(module)
   else:
     print(f'module {modulename} not found !')
-
 
 def main():
   if len(sys.argv) < 3:
@@ -75,7 +74,7 @@ def main():
 
   parser = verible_verilog_syntax.VeribleVerilogSyntax(executable=parser_path)
   modules = parser.build_hier(files, options={"gen_tokens": True})
-  print_refs(modules, module_name)
+  print_parents(modules, module_name)
 
 
 if __name__ == "__main__":

@@ -46,6 +46,7 @@ class ModuleEntry:
     self.fpath = fpath
     self.name = name
     self.refs = refs
+    self.mrefs = []
     self.parents = parents
 
 # Custom tree iterators with an option for reverse children iteration
@@ -490,18 +491,39 @@ class VeribleVerilogSyntax:
     for modulename in modules:
       module = modules[modulename]
       refs = []
-      for ref in module.refs:
-        if ref in modules:
-          modules[ref].parents.append(module)
-          refs.append(ref)
+      for refname in module.refs:
+        if refname in modules:
+          module.mrefs.append(modules[refname])
+          modules[refname].parents.append(module)
+          refs.append(refname)
       module.refs = refs
 
     return modules
 
+  def _build_hier_p3(self, modules):
+    tmp = {}
+    for modulename in modules:
+      module = modules[modulename]
+      if len(module.mrefs) == 0 and len(module.parents) == 0 and len(module.refs) == 0:
+        #print(f'module {module.name} ({module.fpath}) has no references and is not referenced')
+        pass
+      else:
+        module.refs = set(module.refs)
+        module.parents = set(module.parents)
+        module.mrefs = set(module.mrefs)
+        tmp[modulename] = module
+    return tmp
+
   def build_hier(self, paths: List[str], options: Dict[str, Any] = None):
-    json_data = self._parse_json(paths, options = options)
+    if len(paths) == 1 and paths[0].endswith('.json'):
+      with open(paths[0]) as f:
+        json_data = json.load(f)
+    else:
+      json_data = self._parse_json(paths, options = options)
+
     modules = self._build_hier_p1(json_data)
-    return self._build_hier_p2(modules)
+    modules = self._build_hier_p2(modules)
+    return self._build_hier_p3(modules)
 
 
   def _parse(self, paths: List[str], input_: str = None,
