@@ -21,6 +21,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Union
 
 import anytree
 import dataclasses
+import traceback
 
 _CSI_SEQUENCE = re.compile("\033\\[.*?m")
 
@@ -40,6 +41,12 @@ CallableFilter = Callable[["Node"], bool]
 KeyValueFilter = Dict[str, Union[str, List[str]]]
 TreeIterator = Union["_TreeIteratorBase", anytree.iterators.AbstractIter]
 
+class ModuleEntry:
+  def __init__(self, fpath ='',name ='', refs=[], parents=[]):
+    self.fpath = fpath
+    self.name = name
+    self.refs = refs
+    self.parents = parents
 
 # Custom tree iterators with an option for reverse children iteration
 
@@ -416,6 +423,86 @@ class VeribleVerilogSyntax:
   def _transform_errors(tokens) -> List[Error]:
     return [Error(t["line"], t["column"], t["phase"], t.get("message", None))
         for t in tokens]
+
+
+  def _parse_json(self, paths: List[str], input_: str = None,
+             options: Dict[str, Any] = None) -> Dict[str, SyntaxData]:
+    """Common implementation of parse_* methods"""
+    options = {
+      "gen_tree": False,
+      "skip_null": False,
+      "gen_tokens": False,
+      "gen_rawtokens": False,
+      **(options or {}),
+    }
+
+    args = ["-export_json"]
+    if options["gen_tree"]:
+      args.append("-printtree")
+    if options["gen_tokens"]:
+      args.append("-printtokens")
+    if options["gen_rawtokens"]:
+      args.append("-printrawtokens")
+
+    proc = subprocess.run([self.executable, *args , *paths],
+        stdout=subprocess.PIPE,
+        input=input_,
+        encoding="utf-8",
+        check=False)
+
+    return json.loads(proc.stdout)
+
+  def _build_hier_p1(self, json_data):
+    modules = {}
+    for fpath in json_data:
+      it = iter(json_data[fpath]['tokens'])
+      token = next(it)
+
+      try:
+
+        while token['tag'] != 'end of file':
+
+          while token['tag'] != 'module':
+            token = next(it)
+          token = next(it)
+
+          assert token['tag'] == 'SymbolIdentifier'
+          modulename = token['text']
+          modulerefs = []
+
+          token = next(it)
+          while token['tag'] != 'endmodule':
+            if token['tag'] == 'SymbolIdentifier':
+              modulerefs.append(token['text'])
+            token = next(it)
+
+          token = next(it)
+      except StopIteration as e:
+        #traceback.print_exc()
+        #print(f'Failed on {fpath} file')
+        pass
+
+      modules[modulename] = ModuleEntry(fpath, modulename, modulerefs, [])
+
+    return modules
+
+  def _build_hier_p2(self, modules):
+    for modulename in modules:
+      module = modules[modulename]
+      refs = []
+      for ref in module.refs:
+        if ref in modules:
+          modules[ref].parents.append(module)
+          refs.append(ref)
+      module.refs = refs
+
+    return modules
+
+  def build_hier(self, paths: List[str], options: Dict[str, Any] = None):
+    json_data = self._parse_json(paths, options = options)
+    modules = self._build_hier_p1(json_data)
+    return self._build_hier_p2(modules)
+
 
   def _parse(self, paths: List[str], input_: str = None,
              options: Dict[str, Any] = None) -> Dict[str, SyntaxData]:
