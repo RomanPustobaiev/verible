@@ -28,6 +28,7 @@ import sys
 import anytree
 
 import verible_verilog_syntax
+import os
 
 
 def process_file_data(path: str, data: verible_verilog_syntax.SyntaxData):
@@ -50,13 +51,13 @@ def process_file_data(path: str, data: verible_verilog_syntax.SyntaxData):
 
 def print_parents_r(module):
     for parent in module.parents:
-      print(f'{module.name} referenced in {parent.name} ({parent.fpath})')
+      print(f'{module.name} referenced in {parent.name} ({parent.fpath.split(os.sep)[-1]})')
       print_parents_r(parent)
 
 def print_parents(modules, modulename):
   if modulename in modules:
     module = modules[modulename]
-    print(f'module {modulename} ({module.fpath})')
+    print(f'module {modulename} ({module.fpath.split(os.sep)[-1]})')
     print_parents_r(module)
   else:
     print(f'module {modulename} not found !')
