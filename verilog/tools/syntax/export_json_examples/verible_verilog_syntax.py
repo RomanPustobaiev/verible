@@ -453,37 +453,39 @@ class VeribleVerilogSyntax:
 
     return json.loads(proc.stdout)
 
+  def _build_hier_p11(self, modules, fpath, it):
+      token = next(it)
+
+      while token['tag'] != 'end of file':
+
+        while token['tag'] != 'module':
+          token = next(it)
+        token = next(it)
+
+        assert token['tag'] == 'SymbolIdentifier'
+        modulename = token['text']
+        modulerefs = []
+
+        token = next(it)
+        while token['tag'] != 'endmodule':
+          if token['tag'] == 'SymbolIdentifier':
+            modulerefs.append(token['text'])
+          token = next(it)
+
+        token = next(it)
+
+      modules[modulename] = ModuleEntry(fpath, modulename, modulerefs, [])
+
+
   def _build_hier_p1(self, json_data):
     modules = {}
     for fpath in json_data:
       it = iter(json_data[fpath]['tokens'])
-      token = next(it)
 
-      try:
-
-        while token['tag'] != 'end of file':
-
-          while token['tag'] != 'module':
-            token = next(it)
-          token = next(it)
-
-          assert token['tag'] == 'SymbolIdentifier'
-          modulename = token['text']
-          modulerefs = []
-
-          token = next(it)
-          while token['tag'] != 'endmodule':
-            if token['tag'] == 'SymbolIdentifier':
-              modulerefs.append(token['text'])
-            token = next(it)
-
-          token = next(it)
+      try :
+        self._build_hier_p11(modules, fpath, it)
       except StopIteration as e:
-        #traceback.print_exc()
-        #print(f'Failed on {fpath} file')
         pass
-
-      modules[modulename] = ModuleEntry(fpath, modulename, modulerefs, [])
 
     return modules
 
