@@ -23,6 +23,8 @@ import anytree
 import dataclasses
 import traceback
 
+from verible_verilog_helper import VerilogHelper, VerilogProcess
+
 _CSI_SEQUENCE = re.compile("\033\\[.*?m")
 
 
@@ -527,6 +529,26 @@ class VeribleVerilogSyntax:
     modules = self._build_hier_p2(modules)
     return self._build_hier_p3(modules)
 
+  def build_proc(self, proc_name, paths: List[str], options: Dict[str, Any] = None):
+    if len(paths) == 1 and paths[0].endswith('.json'):
+      with open(paths[0]) as f:
+        json_data = json.load(f)
+    else:
+      json_data = self._parse_json(paths, options = options)
+
+    vh = VerilogHelper()
+    procs = {}
+    for fpath in json_data:
+      tokens = json_data[fpath]['tokens']
+      _procs = vh.extract_process(tokens, proc_name)
+      procs[fpath] = _procs
+
+    return procs
+
+  def print_feedback(self, procs):
+    vh = VerilogHelper()
+    for f in procs:
+      vh.comb_feedback(procs[f])
 
   def _parse(self, paths: List[str], input_: str = None,
              options: Dict[str, Any] = None) -> Dict[str, SyntaxData]:
